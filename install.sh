@@ -1,56 +1,15 @@
 #!/bin/bash
 set -e
-# set -x
-#
-# Copyright (c) 2015, Lawrence Livermore National Security, LLC.
-#
-# Produced at the Lawrence Livermore National Laboratory
-#
-# Written by Simone Atzeni, Joachim Protze, Jonas Hahnfeld, Ganesh
-# Gopalakrishnan, Zvonimir Rakamari\'c Dong H. Ahn, Ignacio Laguna,
-# Martin Schulz, and Gregory L. Lee
-#
-# LLNL-CODE-676696
-#
-# All rights reserved.
-#
-# This file is part of Archer. For details, see
-# https://github.com/soarlab/Archer. Please also read Archer/LICENSE.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are
-# met:
-#
-# Redistributions of source code must retain the above copyright notice,
-# this list of conditions and the disclaimer below.
-#
-# Redistributions in binary form must reproduce the above copyright
-# notice, this list of conditions and the disclaimer (as noted below) in
-# the documentation and/or other materials provided with the
-# distribution.
-#
-# Neither the name of the LLNS/LLNL nor the names of its contributors
-# may be used to endorse or promote products derived from this software
-# without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL LAWRENCE
-# LIVERMORE NATIONAL SECURITY, LLC, THE U.S. DEPARTMENT OF ENERGY OR
-# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
 
 if [ "$(uname)" == "Linux" ]; then
     ESCAPE="\e"
 else
     ESCAPE="\x1B"
+fi
+
+ARCH="_"$(uname -m)
+if [[ $HOSTNAME == node* ]]; then
+  ARCH=${ARCH}"_k26"
 fi
 
 RED=$ESCAPE'[0;31m'
@@ -122,13 +81,11 @@ return 0
 
 BASE=
 LLVM_INSTALL=/usr
-RELEASE="39"
-# ARCHER_RELEASE="10"
-ARCHER_RELEASE=
+RELEASE="60"
 HTTP=false
-LLVM_ONLY=false
 UPDATE=false
-TSAN_OMPT=true
+GIT_URL=llvm-mirror
+YORKTOWN=false
 BUILD_TYPE=Release
 GCC_TOOLCHAIN_PATH=
 BUILD_CMD=ninja
@@ -169,16 +126,13 @@ do
             HTTP=true
             shift
             ;;
-        --llvm-only)
-            LLVM_ONLY=true
-            shift
-            ;;
         --update)
             UPDATE=true
             shift
             ;;
-        --omp-tsan-support)
-            TSAN_OMPT=false
+        --yorktown)
+            GIT_URL=clang-ykt
+            YORKTOWN=true
             shift
             ;;
         --build-type=*)
@@ -204,9 +158,6 @@ do
             echo "  --http                       = Enables GitHub web url in case SSH key and"
             echo "                                 passphrase are not set in the GitHub account."
             echo "  --update                     = Update previous building."
-            echo "  --omp-tsan-support           = Enabled ThreadSanitizer support in official"
-            echo "                                 LLVM OpenMP runtime, if not set an LLVM OpenMP"
-            echo "                                 Runtime with OMPT support will be used."
             echo "  --build-type=<value>         = Specify the type of build. Accepted values"
             echo "                                 are Release (default), Debug or RelWithDebInfo."
             echo "  --gcc-toolchain-path=<value> = Specify the GCC toolchain path."
@@ -298,6 +249,7 @@ then
     exit 1
 fi
 
+LLVM_INSTALL=${LLVM_INSTALL}${ARCH}
 echo
 echook "LLVM will be installed at [${LLVM_INSTALL}]"
 
@@ -318,19 +270,11 @@ fi
 #fair share:
 PROCS=$[$PROCS/2]
 
-echo
-if [ "$LLVM_ONLY" == "true" ]; then
-    echook "Installing LLVM/Clang..."
-else
-    echook "Installing LLVM/Clang with Archer Support..."
-fi
-
-if [ "$LLVM_ONLY" == "false" ]; then
-    ARCHER_OFF="-DLLVM_TOOL_ARCHER_BUILD=OFF"
-fi
+echook "Installing LLVM/Clang..."
 
 cd ..
 WORKING_DIR=`pwd`
+BASE=${BASE}${ARCH}
 if [[ "$BASE" = /* ]]; then
     BASE=${BASE}
 else
@@ -347,31 +291,21 @@ LLVM_COMMIT=""
 LLVMRT_COMMIT=""
 CLANG_COMMIT=""
 if [ "$HTTP" == "true" ]; then
-    LLVM_REPO="https://github.com/llvm-mirror/llvm.git"
-    CLANG_REPO="https://github.com/llvm-mirror/clang.git"
-    LLVMRT_REPO="https://github.com/llvm-mirror/compiler-rt.git"
-    LIBCXX_REPO="https://github.com/llvm-mirror/libcxx.git"
-    LIBCXXABI_REPO="https://github.com/llvm-mirror/libcxxabi.git"
-    LIBUNWIND_REPO="https://github.com/llvm-mirror/libunwind.git"
-    ARCHER_REPO="https://github.com/PRUNERS/archer.git"
-    if [ "$TSAN_OMPT" == "true" ]; then
-        OPENMPRT_REPO="https://github.com/OpenMPToolsInterface/LLVM-openmp.git"
-    else
-        OPENMPRT_REPO="https://github.com/llvm-mirror/openmp.git"
-    fi
+    LLVM_REPO="https://github.com/${GIT_URL}/llvm.git"
+    CLANG_REPO="https://github.com/${GIT_URL}/clang.git"
+    LLVMRT_REPO="https://github.com/${GIT_URL}/compiler-rt.git"
+    LIBCXX_REPO="https://github.com/${GIT_URL}/libcxx.git"
+    LIBCXXABI_REPO="https://github.com/${GIT_URL}/libcxxabi.git"
+    LIBUNWIND_REPO="https://github.com/${GIT_URL}/libunwind.git"
+    OPENMPRT_REPO="https://github.com/${GIT_URL}/openmp.git"
 else
-    LLVM_REPO="git@github.com:llvm-mirror/llvm.git"
-    CLANG_REPO="git@github.com:llvm-mirror/clang.git"
-    LLVMRT_REPO="git@github.com:llvm-mirror/compiler-rt.git"
-    LIBCXX_REPO="git@github.com:llvm-mirror/libcxx.git"
-    LIBCXXABI_REPO="git@github.com:llvm-mirror/libcxxabi.git"
-    LIBUNWIND_REPO="git@github.com:llvm-mirror/libunwind.git"
-    ARCHER_REPO="git@github.com:PRUNERS/archer.git"
-    if [  "$TSAN_OMPT" == "true" ]; then
-        OPENMPRT_REPO="git@github.com:OpenMPToolsInterface/LLVM-openmp.git"
-    else
-        OPENMPRT_REPO="git@github.com:llvm-mirror/openmp.git"
-    fi
+    LLVM_REPO="git@github.com:${GIT_URL}/llvm.git"
+    CLANG_REPO="git@github.com:${GIT_URL}/clang.git"
+    LLVMRT_REPO="git@github.com:${GIT_URL}/compiler-rt.git"
+    LIBCXX_REPO="git@github.com:${GIT_URL}/libcxx.git"
+    LIBCXXABI_REPO="git@github.com:${GIT_URL}/libcxxabi.git"
+    LIBUNWIND_REPO="git@github.com:${GIT_URL}/libunwind.git"
+    OPENMPRT_REPO="git@github.com:${GIT_URL}/openmp.git"
 fi
 
 if [ "$RELEASE" == "dev" ]; then
@@ -381,11 +315,7 @@ if [ "$RELEASE" == "dev" ]; then
     LIBCXX_RELEASE=
     LIBCXXABI_RELEASE=
     LIBUNWIND_RELEASE=
-    if [  "$TSAN_OMPT" == "true" ]; then
-        OPENMPRT_RELEASE=towards_tr4
-    else
-        OPENMPRT_RELEASE="release_"$RELEASE
-    fi
+    OPENMPRT_RELEASE=
 else
     LLVM_RELEASE="release_"$RELEASE
     CLANG_RELEASE="release_"$RELEASE
@@ -393,24 +323,19 @@ else
     LIBCXX_RELEASE="release_"$RELEASE
     LIBCXXABI_RELEASE="release_"$RELEASE
     LIBUNWIND_RELEASE="release_"$RELEASE
-    if [  "$TSAN_OMPT" == "true" ]; then
-        OPENMPRT_RELEASE=towards_tr4
-    else
-        OPENMPRT_RELEASE="release_"$RELEASE
-    fi
+    OPENMPRT_RELEASE="release_"$RELEASE
 fi
 
 # LLVM installation directory
-LLVM_SRC=${BASE}/llvm_src
-CLANG_SRC=${BASE}/llvm_src/tools/clang
-LLVMRT_SRC=${BASE}/llvm_src/projects/compiler-rt
-ARCHER_SRC=${BASE}/llvm_src/tools/archer
-OPENMPRT_SRC=${BASE}/llvm_src/projects/openmp
-LIBCXX_SRC=${BASE}/llvm_src/projects/libcxx
-LIBCXXABI_SRC=${BASE}/llvm_src/projects/libcxxabi
-LIBUNWIND_SRC=${BASE}/llvm_src/projects/libunwind
-LLVM_BOOTSTRAP=${BASE}/llvm_bootstrap
-LLVM_BUILD=${BASE}/llvm_build
+LLVM_SRC=${BASE}/llvm_src${ARCH}
+CLANG_SRC=${BASE}/llvm_src${ARCH}/tools/clang
+LLVMRT_SRC=${BASE}/llvm_src${ARCH}/projects/compiler-rt
+OPENMPRT_SRC=${BASE}/llvm_src${ARCH}/projects/openmp
+LIBCXX_SRC=${BASE}/llvm_src${ARCH}/projects/libcxx
+LIBCXXABI_SRC=${BASE}/llvm_src${ARCH}/projects/libcxxabi
+LIBUNWIND_SRC=${BASE}/llvm_src${ARCH}/projects/libunwind
+LLVM_BOOTSTRAP=${BASE}/llvm_bootstrap${ARCH}
+LLVM_BUILD=${BASE}/llvm_build${ARCH}
 mkdir -p ${LLVM_BUILD}
 
 # Obtaining the sources
@@ -425,24 +350,15 @@ echo
 echook "Obtaining LLVM/Clang..."
 git_clone_or_pull ${CLANG_REPO} ${CLANG_SRC} ${CLANG_RELEASE}
 
-# Archer Sources
-if [ "$LLVM_ONLY" == "false" ]; then
-    echo
-    echook "Obtaining Archer..."
-    git_clone_or_pull ${ARCHER_REPO} ${ARCHER_SRC} ${ARCHER_RELEASE}
-fi
-
 # Runtime Sources
 echo
 echook "Obtaining LLVM Runtime..."
 git_clone_or_pull ${LLVMRT_REPO} ${LLVMRT_SRC} ${LLVMRT_RELEASE}
 
 # OpenMP Runtime Sources
-if [ "$LLVM_ONLY" == "false" ]; then
-    echo
-    echook "Obtaining LLVM OpenMP Runtime..."
-    git_clone_or_pull ${OPENMPRT_REPO} ${OPENMPRT_SRC} ${OPENMPRT_RELEASE}
-fi
+echo
+echook "Obtaining LLVM OpenMP Runtime..."
+git_clone_or_pull ${OPENMPRT_REPO} ${OPENMPRT_SRC} ${OPENMPRT_RELEASE}
 
 # libc++ Sources
 echo
@@ -470,7 +386,6 @@ else
     CC=$(which gcc) CXX=$(which g++) cmake -G "${BUILD_SYSTEM}" \
       -DCMAKE_BUILD_TYPE=Release \
       -DLLVM_TARGETS_TO_BUILD=Native \
-      ${ARCHER_OFF} \
       ${GCC_TOOLCHAIN_PATH} \
       "${LLVM_SRC}"
     cd "${LLVM_BOOTSTRAP}"
@@ -483,53 +398,19 @@ export PATH="${LLVM_BOOTSTRAP}/bin:${OLD_PATH}"
 
 echo
 echook "Building LLVM/Clang..."
-cd ${LLVM_BUILD}
-if [ "$LLVM_ONLY" == "true" ]; then
-    cmake -G "${BUILD_SYSTEM}" \
-          -D CMAKE_C_COMPILER=clang \
-          -D CMAKE_CXX_COMPILER=clang++ \
-          -D CMAKE_BUILD_TYPE=${BUILD_TYPE} \
-          -D CMAKE_INSTALL_PREFIX:PATH=${LLVM_INSTALL} \
-          -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
-          -D LLVM_ENABLE_LIBCXX=ON \
-          -D LLVM_ENABLE_LIBCXXABI=ON \
-          -D LIBCXXABI_USE_LLVM_UNWINDER=ON \
-          -D CLANG_DEFAULT_CXX_STDLIB=libc++ \
-          ${GCC_TOOLCHAIN_PATH} \
-          ${LLVM_SRC}
-elif [  "$TSAN_OMPT" == "true" ]; then
-    cmake -G "${BUILD_SYSTEM}" \
-          -D CMAKE_C_COMPILER=clang \
-          -D CMAKE_CXX_COMPILER=clang++ \
-          -D CMAKE_BUILD_TYPE=${BUILD_TYPE} \
-          -D CMAKE_INSTALL_PREFIX:PATH=${LLVM_INSTALL} \
-          -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
-          -D LLVM_ENABLE_LIBCXX=ON \
-          -D LLVM_ENABLE_LIBCXXABI=ON \
-          -D LIBCXXABI_USE_LLVM_UNWINDER=ON \
-          -D CLANG_DEFAULT_CXX_STDLIB=libc++ \
-          -D LIBOMP_OMP_VERSION=50 \
-          -D LIBOMP_OMPT_SUPPORT=on \
-          -D LIBOMP_OMPT_BLAME=on \
-          -D LIBOMP_OMPT_TRACE=on \
-          ${GCC_TOOLCHAIN_PATH} \
-          ${LLVM_SRC}
-else
-    cmake -G "${BUILD_SYSTEM}" \
-          -D CMAKE_C_COMPILER=clang \
-          -D CMAKE_CXX_COMPILER=clang++ \
-          -D CMAKE_BUILD_TYPE=${BUILD_TYPE} \
-          -D CMAKE_INSTALL_PREFIX:PATH=${LLVM_INSTALL} \
-          -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
-          -D LLVM_ENABLE_LIBCXX=ON \
-          -D LLVM_ENABLE_LIBCXXABI=ON \
-          -D LIBCXXABI_USE_LLVM_UNWINDER=ON \
-          -D CLANG_DEFAULT_CXX_STDLIB=libc++ \
-          -D LIBOMP_TSAN_SUPPORT=TRUE \
-          ${GCC_TOOLCHAIN_PATH} \
-          ${LLVM_SRC}
-fi
-
+cmake -G "${BUILD_SYSTEM}" \
+      -D CMAKE_C_COMPILER=clang \
+      -D CMAKE_CXX_COMPILER=clang++ \
+      -D CMAKE_BUILD_TYPE=${BUILD_TYPE} \
+      -D CMAKE_INSTALL_PREFIX:PATH=${LLVM_INSTALL} \
+      -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
+      -D LLVM_ENABLE_LIBCXX=ON \
+      -D LLVM_ENABLE_LIBCXXABI=ON \
+      -D LIBCXXABI_USE_LLVM_UNWINDER=ON \
+      -D CLANG_DEFAULT_CXX_STDLIB=libc++ \
+      -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
+      ${GCC_TOOLCHAIN_PATH} \
+      ${LLVM_SRC}
 cd "${LLVM_BUILD}"
 ${BUILD_CMD} -j${PROCS} -l${PROCS}
 # ${BUILD_CMD} check-libarcher
