@@ -81,11 +81,12 @@ return 0
 
 BASE=
 LLVM_INSTALL=/usr
-RELEASE="60"
+RELEASE="dev"
 HTTP=false
 UPDATE=false
 GIT_URL=llvm-mirror
 YORKTOWN=false
+YKT_FLAG=""
 BUILD_TYPE=Release
 GCC_TOOLCHAIN_PATH=
 BUILD_CMD=ninja
@@ -133,6 +134,15 @@ do
         --yorktown)
             GIT_URL=clang-ykt
             YORKTOWN=true
+            YKT_FLAG="-DLLVM_ENABLE_BACKTRACES=ON \
+                    -DLLVM_ENABLE_WERROR=OFF \
+                    -DBUILD_SHARED_LIBS=OFF \
+                    -DLLVM_ENABLE_RTTI=ON \
+                    -DOPENMP_ENABLE_LIBOMPTARGET=ON \
+                    -DCMAKE_C_FLAGS='-DOPENMP_NVPTX_COMPUTE_CAPABILITY=37' \
+                    -DCMAKE_CXX_FLAGS='-DOPENMP_NVPTX_COMPUTE_CAPABILITY=37' \
+                    -DLIBOMPTARGET_NVPTX_COMPUTE_CAPABILITY=37 \
+                    -DLIBOMPTARGET_NVPTX_ENABLE_BCLIB=true"
             shift
             ;;
         --build-type=*)
@@ -350,30 +360,34 @@ echo
 echook "Obtaining LLVM/Clang..."
 git_clone_or_pull ${CLANG_REPO} ${CLANG_SRC} ${CLANG_RELEASE}
 
-# Runtime Sources
-echo
-echook "Obtaining LLVM Runtime..."
-git_clone_or_pull ${LLVMRT_REPO} ${LLVMRT_SRC} ${LLVMRT_RELEASE}
+if [ "$YORKTOWN" == "false" ]; then
+    # Runtime Sources
+    echo
+    echook "Obtaining LLVM Runtime..."
+    git_clone_or_pull ${LLVMRT_REPO} ${LLVMRT_SRC} ${LLVMRT_RELEASE}
+fi
 
 # OpenMP Runtime Sources
 echo
 echook "Obtaining LLVM OpenMP Runtime..."
 git_clone_or_pull ${OPENMPRT_REPO} ${OPENMPRT_SRC} ${OPENMPRT_RELEASE}
 
-# libc++ Sources
-echo
-echook "Obtaining LLVM libc++..."
-git_clone_or_pull ${LIBCXX_REPO} ${LIBCXX_SRC} ${LIBCXX_RELEASE}
+if [ "$YORKTOWN" == "false" ]; then
+    # libc++ Sources
+    echo
+    echook "Obtaining LLVM libc++..."
+    git_clone_or_pull ${LIBCXX_REPO} ${LIBCXX_SRC} ${LIBCXX_RELEASE}
 
-# libc++abi Sources
-echo
-echook "Obtaining LLVM libc++abi..."
-git_clone_or_pull ${LIBCXXABI_REPO} ${LIBCXXABI_SRC} ${LIBCXXABI_RELEASE}
+    # libc++abi Sources
+    echo
+    echook "Obtaining LLVM libc++abi..."
+    git_clone_or_pull ${LIBCXXABI_REPO} ${LIBCXXABI_SRC} ${LIBCXXABI_RELEASE}
 
-# libunwind Sources
-echo
-echook "Obtaining LLVM libunwind..."
-git_clone_or_pull ${LIBUNWIND_REPO} ${LIBUNWIND_SRC} ${LIBUNWIND_RELEASE}
+    # libunwind Sources
+    echo
+    echook "Obtaining LLVM libunwind..."
+    git_clone_or_pull ${LIBUNWIND_REPO} ${LIBUNWIND_SRC} ${LIBUNWIND_RELEASE}
+fi
 
 # Compiling and installing LLVM
 echook "Bootstraping clang..."
@@ -404,6 +418,7 @@ cmake -G "${BUILD_SYSTEM}" \
       -D CMAKE_BUILD_TYPE=${BUILD_TYPE} \
       -D CMAKE_INSTALL_PREFIX:PATH=${LLVM_INSTALL} \
       -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
+      ${YKT_FLAG} \
       -D LLVM_ENABLE_LIBCXX=ON \
       -D LLVM_ENABLE_LIBCXXABI=ON \
       -D LIBCXXABI_USE_LLVM_UNWINDER=ON \
