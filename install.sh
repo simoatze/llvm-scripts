@@ -204,7 +204,7 @@ if mygit=$(which git 2>/dev/null)
 then
     echook Found git at $mygit [OK]
 else
-    echoc Cannot find git. Necessary for building Archer. [ERROR]
+    echoc Cannot find git. Necessary for building Clang/LLVM. [ERROR]
     myerrors=1
 fi
 
@@ -219,7 +219,7 @@ then
         myerrors=1
     fi
 else
-    echoc Cannot find cmake. Necessary for building Archer. [ERROR]
+    echoc Cannot find cmake. Necessary for building Clang/LLVM. [ERROR]
     myerrors=1
 fi
 
@@ -234,7 +234,7 @@ then
         myerrors=1
     fi
 else
-    echoc Cannot find gcc. Necessary for building Archer. [ERROR]
+    echoc Cannot find gcc. Necessary for building Clang/LLVM. [ERROR]
     myerrors=1
 fi
 
@@ -249,13 +249,13 @@ then
         myerrors=1
     fi
 else
-    echoc Cannot find python. Necessary for building Archer. [ERROR]
+    echoc Cannot find python. Necessary for building Clang/LLVM. [ERROR]
     myerrors=1
 fi
 
 if [ $myerrors -gt 0 ]
 then
-    echoc Stop building Archer for missing requirements.
+    echoc Stop building Clang/LLVM for missing requirements.
     exit 1
 fi
 
@@ -428,7 +428,6 @@ cmake -G "${BUILD_SYSTEM}" \
       ${LLVM_SRC}
 cd "${LLVM_BUILD}"
 ${BUILD_CMD} -j${PROCS} -l${PROCS}
-# ${BUILD_CMD} check-libarcher
 ${BUILD_CMD} install
 
 export PATH=${LLVM_INSTALL}/bin:${OLD_PATH}
