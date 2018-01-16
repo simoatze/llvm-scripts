@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -ex
 
 if [ "$(uname)" == "Linux" ]; then
     ESCAPE="\e"
@@ -134,15 +134,6 @@ do
         --yorktown)
             GIT_URL=clang-ykt
             YORKTOWN=true
-            YKT_FLAG="-DLLVM_ENABLE_BACKTRACES=ON \
-                    -DLLVM_ENABLE_WERROR=OFF \
-                    -DBUILD_SHARED_LIBS=OFF \
-                    -DLLVM_ENABLE_RTTI=ON \
-                    -DOPENMP_ENABLE_LIBOMPTARGET=ON \
-                    -DCMAKE_C_FLAGS='-DOPENMP_NVPTX_COMPUTE_CAPABILITY=37' \
-                    -DCMAKE_CXX_FLAGS='-DOPENMP_NVPTX_COMPUTE_CAPABILITY=37' \
-                    -DLIBOMPTARGET_NVPTX_COMPUTE_CAPABILITY=37 \
-                    -DLIBOMPTARGET_NVPTX_ENABLE_BCLIB=true"
             shift
             ;;
         --build-type=*)
@@ -411,19 +402,43 @@ export PATH="${LLVM_BOOTSTRAP}/bin:${OLD_PATH}"
 echo
 echook "Building LLVM/Clang..."
 mkdir -p "${LLVM_BUILD}" && cd "${LLVM_BUILD}"
-cmake -G "${BUILD_SYSTEM}" \
+if [ "$YORKTOWN" == "false" ]; then
+    cmake -G "${BUILD_SYSTEM}" \
       -D CMAKE_C_COMPILER=clang \
       -D CMAKE_CXX_COMPILER=clang++ \
       -D CMAKE_BUILD_TYPE=${BUILD_TYPE} \
       -D CMAKE_INSTALL_PREFIX:PATH=${LLVM_INSTALL} \
       -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
-      ${YKT_FLAG} \
       -D LLVM_ENABLE_LIBCXX=ON \
       -D LIBCXXABI_USE_LLVM_UNWINDER=ON \
-      -D CLANG_DEFAULT_CXX_STDLIB=libc++ \
       -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
       ${GCC_TOOLCHAIN_PATH} \
       ${LLVM_SRC}
+else
+    cmake -G "${BUILD_SYSTEM}" \
+      -D CMAKE_BUILD_TYPE=${BUILD_TYPE} \
+      -D CMAKE_INSTALL_PREFIX:PATH=${LLVM_INSTALL} \
+      -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
+      -D LLVM_ENABLE_LIBCXX=ON \
+      -D LIBCXXABI_USE_LLVM_UNWINDER=ON \
+      -D LLVM_ENABLE_BACKTRACES=ON \
+      -D LLVM_ENABLE_WERROR=OFF \
+      -D BUILD_SHARED_LIBS=OFF \
+      -D LLVM_ENABLE_RTTI=ON \
+      -D OPENMP_ENABLE_LIBOMPTARGET=ON \
+      -D CMAKE_C_FLAGS='-DOPENMP_NVPTX_COMPUTE_CAPABILITY=35' \
+      -D CMAKE_CXX_FLAGS='-DOPENMP_NVPTX_COMPUTE_CAPABILITY=35' \
+      -D LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITY=35 \
+      -D CLANG_OPENMP_NVPTX_DEFAULT_ARCH=sm_35 \
+      -D LIBOMPTARGET_NVPTX_ENABLE_BCLIB=true \
+      -D LIBOMPTARGET_DEP_LIBELF_INCLUDE_DIR=$HOME/system/${ARCH}/usr/include \
+      -D LIBOMPTARGET_DEP_LIBFFI_INCLUDE_DIR=$HOME/system/${ARCH}/usr/lib/libffi-3.2.1/include \
+      -D CMAKE_C_COMPILER=gcc \
+      -D CMAKE_CXX_COMPILER=g++ \
+      -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
+      ${GCC_TOOLCHAIN_PATH} \
+      ${LLVM_SRC}
+fi
 ${BUILD_CMD} -j${PROCS}
 ${BUILD_CMD} install
 
