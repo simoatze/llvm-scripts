@@ -278,7 +278,7 @@ else
     fi
 fi
 #fair share:
-PROCS=$[$PROCS/2]
+# PROCS=$[$PROCS/2]
 
 echook "Installing LLVM/Clang..."
 
@@ -337,16 +337,15 @@ else
 fi
 
 # LLVM installation directory
-LLVM_SRC=${BASE}/llvm_src${ARCH}
-CLANG_SRC=${BASE}/llvm_src${ARCH}/tools/clang
-LLVMRT_SRC=${BASE}/llvm_src${ARCH}/projects/compiler-rt
-OPENMPRT_SRC=${BASE}/llvm_src${ARCH}/projects/openmp
-LIBCXX_SRC=${BASE}/llvm_src${ARCH}/projects/libcxx
-LIBCXXABI_SRC=${BASE}/llvm_src${ARCH}/projects/libcxxabi
-LIBUNWIND_SRC=${BASE}/llvm_src${ARCH}/projects/libunwind
-LLVM_BOOTSTRAP=${BASE}/llvm_bootstrap${ARCH}
-LLVM_BUILD=${BASE}/llvm_build${ARCH}
-mkdir -p ${LLVM_BUILD}
+LLVM_SRC=${BASE}/llvm_src
+CLANG_SRC=${BASE}/llvm_src/tools/clang
+LLVMRT_SRC=${BASE}/llvm_src/projects/compiler-rt
+OPENMPRT_SRC=${BASE}/llvm_src/projects/openmp
+LIBCXX_SRC=${BASE}/llvm_src/projects/libcxx
+LIBCXXABI_SRC=${BASE}/llvm_src/projects/libcxxabi
+LIBUNWIND_SRC=${BASE}/llvm_src/projects/libunwind
+LLVM_BOOTSTRAP=${BASE}/llvm_bootstrap
+LLVM_BUILD=${BASE}/llvm_build
 
 # Obtaining the sources
 
@@ -403,8 +402,7 @@ else
       ${GCC_TOOLCHAIN_PATH} \
       "${LLVM_SRC}"
     cd "${LLVM_BOOTSTRAP}"
-    ${BUILD_CMD} -j${PROCS} -l${PROCS}
-
+    ${BUILD_CMD} -j${PROCS}
 fi
 
 export LD_LIBRARY_PATH="${LLVM_BOOTSTRAP}/lib:${OLD_LD_LIBRARY_PATH}"
@@ -412,6 +410,7 @@ export PATH="${LLVM_BOOTSTRAP}/bin:${OLD_PATH}"
 
 echo
 echook "Building LLVM/Clang..."
+mkdir -p "${LLVM_BUILD}" && cd "${LLVM_BUILD}"
 cmake -G "${BUILD_SYSTEM}" \
       -D CMAKE_C_COMPILER=clang \
       -D CMAKE_CXX_COMPILER=clang++ \
@@ -420,14 +419,12 @@ cmake -G "${BUILD_SYSTEM}" \
       -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
       ${YKT_FLAG} \
       -D LLVM_ENABLE_LIBCXX=ON \
-      -D LLVM_ENABLE_LIBCXXABI=ON \
       -D LIBCXXABI_USE_LLVM_UNWINDER=ON \
       -D CLANG_DEFAULT_CXX_STDLIB=libc++ \
       -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
       ${GCC_TOOLCHAIN_PATH} \
       ${LLVM_SRC}
-cd "${LLVM_BUILD}"
-${BUILD_CMD} -j${PROCS} -l${PROCS}
+${BUILD_CMD} -j${PROCS}
 ${BUILD_CMD} install
 
 export PATH=${LLVM_INSTALL}/bin:${OLD_PATH}
