@@ -1,5 +1,5 @@
 #!/bin/bash
-set -ex
+set -e
 
 if [ "$(uname)" == "Linux" ]; then
     ESCAPE="\e"
@@ -7,7 +7,7 @@ else
     ESCAPE="\x1B"
 fi
 
-ARCH="_"$(uname -m)
+ARCH=$(uname -m)
 if [[ $HOSTNAME == node* ]]; then
   ARCH=${ARCH}"_k26"
 fi
@@ -250,7 +250,7 @@ then
     exit 1
 fi
 
-LLVM_INSTALL=${LLVM_INSTALL}${ARCH}
+LLVM_INSTALL=${LLVM_INSTALL}"_"${ARCH}"_"${BUILD_TYPE,,}
 echo
 echook "LLVM will be installed at [${LLVM_INSTALL}]"
 
@@ -275,7 +275,7 @@ echook "Installing LLVM/Clang..."
 
 cd ..
 WORKING_DIR=`pwd`
-BASE=${BASE}${ARCH}
+BASE=${BASE}"_"${ARCH}"_"${BUILD_TYPE,,}
 if [[ "$BASE" = /* ]]; then
     BASE=${BASE}
 else
@@ -390,6 +390,8 @@ else
     CC=$(which gcc) CXX=$(which g++) cmake -G "${BUILD_SYSTEM}" \
       -DCMAKE_BUILD_TYPE=Release \
       -DLLVM_TARGETS_TO_BUILD=Native \
+      -D LLVM_ENABLE_LIBCXX=ON \
+      -D LIBCXXABI_USE_LLVM_UNWINDER=ON \
       ${GCC_TOOLCHAIN_PATH} \
       "${LLVM_SRC}"
     cd "${LLVM_BOOTSTRAP}"
@@ -398,6 +400,7 @@ fi
 
 export LD_LIBRARY_PATH="${LLVM_BOOTSTRAP}/lib:${OLD_LD_LIBRARY_PATH}"
 export PATH="${LLVM_BOOTSTRAP}/bin:${OLD_PATH}"
+export CUDAPATH="/opt/cuda-8.0"
 
 echo
 echook "Building LLVM/Clang..."
@@ -408,7 +411,6 @@ if [ "$YORKTOWN" == "false" ]; then
       -D CMAKE_CXX_COMPILER=clang++ \
       -D CMAKE_BUILD_TYPE=${BUILD_TYPE} \
       -D CMAKE_INSTALL_PREFIX:PATH=${LLVM_INSTALL} \
-      -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
       -D LLVM_ENABLE_LIBCXX=ON \
       -D LIBCXXABI_USE_LLVM_UNWINDER=ON \
       -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
@@ -417,10 +419,10 @@ if [ "$YORKTOWN" == "false" ]; then
 else
     cmake -G "${BUILD_SYSTEM}" \
       -D CMAKE_BUILD_TYPE=${BUILD_TYPE} \
+      -D CMAKE_C_COMPILER=clang \
+      -D CMAKE_CXX_COMPILER=clang++ \
       -D CMAKE_INSTALL_PREFIX:PATH=${LLVM_INSTALL} \
       -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
-      -D LLVM_ENABLE_LIBCXX=ON \
-      -D LIBCXXABI_USE_LLVM_UNWINDER=ON \
       -D LLVM_ENABLE_BACKTRACES=ON \
       -D LLVM_ENABLE_WERROR=OFF \
       -D BUILD_SHARED_LIBS=OFF \
@@ -433,11 +435,8 @@ else
       -D LIBOMPTARGET_NVPTX_ENABLE_BCLIB=true \
       -D LIBOMPTARGET_DEP_LIBELF_INCLUDE_DIR=$HOME/system/${ARCH}/usr/include \
       -D LIBOMPTARGET_DEP_LIBFFI_INCLUDE_DIR=$HOME/system/${ARCH}/usr/lib/libffi-3.2.1/include \
-      -D CMAKE_C_COMPILER=gcc \
-      -D CMAKE_CXX_COMPILER=g++ \
-      -D CLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
-      ${GCC_TOOLCHAIN_PATH} \
       ${LLVM_SRC}
+#      ${GCC_TOOLCHAIN_PATH}
 fi
 ${BUILD_CMD} -j${PROCS}
 ${BUILD_CMD} install
