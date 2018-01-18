@@ -1,5 +1,5 @@
-OB#!/bin/bash
-set -ex
+#!/bin/bash
+set -e
 
 if [ "$(uname)" == "Linux" ]; then
     ESCAPE="\e"
