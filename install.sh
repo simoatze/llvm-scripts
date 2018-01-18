@@ -86,6 +86,7 @@ HTTP=false
 UPDATE=false
 GIT_URL=llvm-mirror
 YORKTOWN=false
+BOOTSTRAP=true
 YKT_FLAG=""
 BUILD_TYPE=Release
 GCC_TOOLCHAIN_PATH=
@@ -134,6 +135,10 @@ do
         --yorktown)
             GIT_URL=clang-ykt
             YORKTOWN=true
+            shift
+            ;;
+        --no-bootstrap)
+            BOOTSTRAP=false
             shift
             ;;
         --build-type=*)
@@ -380,22 +385,24 @@ if [ "$YORKTOWN" == "false" ]; then
 fi
 
 # Compiling and installing LLVM
-echook "Bootstraping clang..."
-OLD_PATH=${PATH}
-OLD_LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
-if [[ -f "${LLVM_BOOTSTRAP}/bin/clang" ]]; then
-    echo "bootstrap already built!"
-else
-    mkdir -p "${LLVM_BOOTSTRAP}" && cd "${LLVM_BOOTSTRAP}"
-    CC=$(which gcc) CXX=$(which g++) cmake -G "${BUILD_SYSTEM}" \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DLLVM_TARGETS_TO_BUILD=Native \
-      -D LLVM_ENABLE_LIBCXX=ON \
-      -D LIBCXXABI_USE_LLVM_UNWINDER=ON \
-      ${GCC_TOOLCHAIN_PATH} \
-      "${LLVM_SRC}"
-    cd "${LLVM_BOOTSTRAP}"
-    ${BUILD_CMD} -j${PROCS}
+if [ "$BOOTSTRAP" == "true" ]; then
+    echook "Bootstraping clang..."
+    OLD_PATH=${PATH}
+    OLD_LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
+    if [[ -f "${LLVM_BOOTSTRAP}/bin/clang" ]]; then
+        echo "bootstrap already built!"
+    else
+        mkdir -p "${LLVM_BOOTSTRAP}" && cd "${LLVM_BOOTSTRAP}"
+        CC=$(which gcc) CXX=$(which g++) cmake -G "${BUILD_SYSTEM}" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DLLVM_TARGETS_TO_BUILD=Native \
+          -D LLVM_ENABLE_LIBCXX=ON \
+          -D LIBCXXABI_USE_LLVM_UNWINDER=ON \
+          ${GCC_TOOLCHAIN_PATH} \
+          "${LLVM_SRC}"
+        cd "${LLVM_BOOTSTRAP}"
+        ${BUILD_CMD} -j${PROCS}
+    fi
 fi
 
 export LD_LIBRARY_PATH="${LLVM_BOOTSTRAP}/lib:${OLD_LD_LIBRARY_PATH}"
