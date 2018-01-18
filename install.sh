@@ -1,5 +1,5 @@
-#!/bin/bash
-set -e
+OB#!/bin/bash
+set -ex
 
 if [ "$(uname)" == "Linux" ]; then
     ESCAPE="\e"
@@ -92,7 +92,7 @@ BUILD_TYPE=Release
 GCC_TOOLCHAIN_PATH=
 BUILD_CMD=ninja
 BUILD_SYSTEM="Ninja"
-if ! command_loc="$(type -p "$BUILD_CMD")" || [  -z "$command_loc" ]; then
+if ! command_loc="$(type -p "$BUILD_CMD")" || [ -z "$command_loc" ]; then
     BUILD_CMD=make
     BUILD_SYSTEM="Unix Makefiles"
 fi
@@ -397,7 +397,6 @@ if [ "$BOOTSTRAP" == "true" ]; then
           -DCMAKE_BUILD_TYPE=Release \
           -DLLVM_TARGETS_TO_BUILD=Native \
           -D LLVM_ENABLE_LIBCXX=ON \
-          -D LIBCXXABI_USE_LLVM_UNWINDER=ON \
           ${GCC_TOOLCHAIN_PATH} \
           "${LLVM_SRC}"
         cd "${LLVM_BOOTSTRAP}"
